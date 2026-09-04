@@ -1,120 +1,57 @@
-# Cirrhosis Decompensation Agent
+# Cirrhosis Decompensation, MELD Suite & ACLF Clinical Decision Support Engine
 
-> **Domain:** Gastroenterology, Hepatology & Clinical Nutrition  
-> **Reference Guidelines & Standards:** `AASLD & ACG Clinical Practice Guidelines`
-
-<div align="center">
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
-
-</div>
+> **Domain:** Hepatology, Critical Care Gastroenterology & Liver Transplantation  
+> **Clinical Guidelines & Standards:** AASLD 2021 Practice Guidance on Prevention and Management of Cirrhosis Complications, EASL Clinical Practice Guidelines on Decompensated Cirrhosis (2018), OPTN MELD 3.0 Policy, EASL-CLIF Consortium ACLF Definitions, International Club of Ascites (ICA) HRS-AKI Diagnostic Criteria
 
 ---
 
-## 📖 What It Does
+## 📖 Clinical Overview
 
-**Cirrhosis Decompensation Agent** is an advanced analytical and computational platform implementing MELD 3.0, SBP Ascitic Analysis & Hepatorenal Syndrome Staging.
+The **Cirrhosis Decompensation Agent** provides multi-dimensional clinical decision support for patients experiencing acute decompensation of cirrhosis. It computes the entire MELD family (Original MELD, MELD-Na, and MELD 3.0 with female sex coefficient and serum albumin integration), grades Child-Turcotte-Pugh status, diagnoses and protocols Spontaneous Bacterial Peritonitis (SBP ascitic PMN $\ge 250/\mu\text{L}$ with Sort Albumin dosing), stages Hepatorenal Syndrome (HRS-AKI with Terlipressin/Albumin protocols), audits EASL-CLIF Acute-on-Chronic Liver Failure (ACLF Grades 1–3), and screens transjugular intrahepatic portosystemic shunt (TIPS) candidacy.
 
----
+### Key Clinical Protocols & Formulas
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+#### 1. MELD 3.0 Formula (OPTN/UNOS 2023 Implementation)
+$$\begin{aligned}
+\text{MELD 3.0} = & 1.33 \times (\text{Female}) + [4.56 \times \ln(\text{Bilirubin})] + [0.82 \times (137 - \text{Na})] - [0.24 \times (137 - \text{Na}) \times \ln(\text{Bilirubin})] \\
+& + [9.09 \times \ln(\text{INR})] + [11.14 \times \ln(\text{Creatinine})] + [1.85 \times (3.5 - \text{Albumin})] - [1.83 \times (3.5 - \text{Albumin}) \times \ln(\text{Creatinine})] + 6.64
+\end{aligned}$$
+*(Upper limit capped at 40; variables bound to physiological boundaries).*
 
-### 🔬 Core Algorithmic & Evaluation Engines
-
-- **`AscitesDegree`** — dedicated module for ascites degree evaluation and state verification.
-- **`EncephalopathyGrade`** — dedicated module for encephalopathy grade evaluation and state verification.
-- **`ChildPughClass`** — dedicated module for child pugh class evaluation and state verification.
-- **`ACLFGrade`** — dedicated module for a c l f grade evaluation and state verification.
-- **`MELDResult`** — dedicated module for m e l d result evaluation and state verification.
-- **`ChildPughResult`** — dedicated module for child pugh result evaluation and state verification.
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  implementing standard international clinical formulas and consensus guidelines:
-  meld_score = int(round(meld_raw))
-  score = int(round(meld_na_raw))
-  score = original_meld
-  score = int(round(meld_3_raw))
-```
+#### 2. Acute Complication Management Protocols
+- **Spontaneous Bacterial Peritonitis (SBP):** Ascitic PMN $\ge 250/\mu\text{L} \implies$ 3rd-gen cephalosporin (Cefotaxime 2g IV q8h) + IV Albumin ($1.5\,\text{g/kg}$ within 6 hours, $1.0\,\text{g/kg}$ on Day 3).
+- **HRS-AKI Protocol:** ICA-AKI criteria met without response to 48h diuretic cessation and albumin volume expansion $\implies$ Terlipressin (1 mg IV bolus q4-6h) + Albumin ($20 - 40\,\text{g/day}$).
+- **EASL-CLIF ACLF Classification:** Evaluates failure across 6 organ systems (Liver, Kidney, Brain, Coagulation, Circulation, Respiration) grading ACLF 1 through 3 with ICU allocation alerts.
 
 ---
 
 ## 💻 CLI Quickstart & Usage
 
-### 1. Guided Interactive Mode
+### 1. Comprehensive Decompensation Audit
 ```bash
-python cli.py
+python cli.py evaluate --cr 1.9 --bili 3.8 --inr 1.8 --na 131.0 --albumin 2.7 --female --ascites moderate --he 1 --pmn 280
 ```
 
-### 2. Direct Parameterized Evaluation
+### 2. Isolated MELD Suite Calculation
 ```bash
-python cli.py --cr <value> --bili <value> --inr <value> --na <value>
+python cli.py meld --cr 2.4 --bili 5.8 --inr 2.2 --na 127.0 --albumin 2.4 --female
 ```
 
-### Parameter Reference
-- `--cr`: Specifies input measurement or parameter value.
-- `--bili`: Specifies input measurement or parameter value.
-- `--inr`: Specifies input measurement or parameter value.
-- `--na`: Specifies input measurement or parameter value.
-- `--alb`: Specifies input measurement or parameter value.
-- `--weight`: Specifies input measurement or parameter value.
-- `--female`: Specifies input measurement or parameter value.
-- `--ascites`: Specifies input measurement or parameter value.
-- `--he`: Specifies input measurement or parameter value.
-- `--pmn`: Specifies input measurement or parameter value.
-
-### Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `case_id` | Parameter / observation metric | Required |
-| `patient_id` | Parameter / observation metric | Required |
-| `creatinine` | Parameter / observation metric | Required |
-| `bilirubin` | Parameter / observation metric | Required |
-| `inr` | Parameter / observation metric | Required |
-| `sodium` | Parameter / observation metric | Required |
-| `albumin` | Parameter / observation metric | Required |
-| `weight_kg` | Parameter / observation metric | Required |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
-
+### 3. SBP Paracentesis Evaluation
 ```bash
-pytest -v
+python cli.py sbp --pmn 420 --weight 68.0 --creatinine 2.4 --bilirubin 5.8
 ```
 
-Execute high-throughput batch simulation benchmarks:
-
+### 4. Batch Process Cirrhosis Cohort CSV
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python cli.py batch -i sample.csv -o out_results.csv
 ```
 
 ---
 
-## 🐳 Container Deployment
+## 🧪 Verification & Testing
 
+Execute comprehensive unit tests via pytest:
 ```bash
-docker build -t cirrhosis-decompensation-agent .
-docker run -p 8000:8000 cirrhosis-decompensation-agent
+python -m pytest -p no:zarr
 ```
