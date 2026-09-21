@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Command-Line Interface for Cirrhosis Decompensation & ACLF Clinical Decision Support Engine.
+Command-line interface for cirrhosis scoring and decompensation assessment utilities.
 
 Usage:
     python cli.py evaluate --cr 1.8 --bili 3.5 --inr 1.9 --na 132 --alb 2.6 --weight 75 --female --ascites moderate --he 2 --pmn 320
@@ -48,17 +48,18 @@ def format_cirrhosis_dossier_display(dossier):
     m = d['meld_suite']
     print(f"  MELD SUITE:")
     print(f"    - Original MELD (2002):  {m['original_meld']}")
-    print(f"    - MELD-Na (UNOS 2016):   {m['meld_na']} (3-Month Waitlist Mortality: {m['three_month_mortality_pct']}%)")
+    print(f"    - MELD-Na (UNOS 2016):   {m['meld_na']}")
+    print(f"    - Legacy MELD mortality band: {m['three_month_mortality_pct']}% (not individualized)")
     if m.get('meld_3_0'):
         print(f"    - MELD 3.0 (OPTN 2023):  {m['meld_3_0']}")
-    print(f"    - Allocation Tier:       [{m['allocation_tier']}]")
+    print(f"    - MELD-Na Band:          [{m['allocation_tier']}]")
     print("-" * 80)
 
     ctp = d['child_pugh']
     print(f"  CHILD-TURCOTTE-PUGH (CTP):")
     print(f"    - Class & Score:         Class {ctp['ctp_class']} ({ctp['total_points']} points)")
-    print(f"    - Survival Estimates:    1-Year: {ctp['one_year_survival_pct']}% | 2-Year: {ctp['two_year_survival_pct']}%")
-    print(f"    - Perioperative Risk:    {ctp['perioperative_mortality_pct']}% Mortality")
+    print(f"    - Historical estimates:  1-Year: {ctp['one_year_survival_pct']}% | 2-Year: {ctp['two_year_survival_pct']}%")
+    print(f"    - Historical perioperative figure: {ctp['perioperative_mortality_pct']}%")
     print(f"    - Interpretation:        {ctp['clinical_interpretation']}")
     print("-" * 80)
 
@@ -66,7 +67,7 @@ def format_cirrhosis_dossier_display(dossier):
     print(f"  EASL-CLIF ACLF STATUS:")
     print(f"    - Staging / Grade:       {aclf['aclf_grade_label']}")
     print(f"    - 28-Day Mortality:      {aclf['twenty_eight_day_mortality_pct']}%")
-    print(f"    - ICU Indicated:         {'YES' if aclf['icu_admission_indicated'] else 'No'}")
+    print(f"    - Higher-acuity flag:    {'YES' if aclf['icu_admission_indicated'] else 'No'}")
     of = aclf['organ_failures']
     print(f"    - Organ Failures ({of['total_failures_count']}/6): "
           f"Liver={of['liver_failure']}, Kidney={of['kidney_failure']}, Brain={of['brain_failure']}, "
@@ -88,15 +89,15 @@ def format_cirrhosis_dossier_display(dossier):
     if d.get('hrs_aki_protocol'):
         hrs = d['hrs_aki_protocol']
         print(f"  HEPATORENAL SYNDROME (HRS-AKI):")
-        print(f"    - HRS-AKI Suspected:     {'YES (ICA Criteria Met)' if hrs['is_hrs_aki_suspected'] else 'No'}")
+        print(f"    - HRS-AKI Screen:        {'POSITIVE (verify clinically)' if hrs['is_hrs_aki_suspected'] else 'Not positive / incomplete'}")
         print(f"    - KDIGO AKI Stage:       Stage {hrs['kdigo_aki_stage']}")
         print(f"    - First-Line Therapy:    {hrs['first_line_pharmacotherapy']}")
         print(f"    - Albumin Protocol:      {hrs['albumin_infusion_plan']}")
         print("-" * 80)
 
     tips = d['tips_eligibility']
-    print(f"  TIPS ELIGIBILITY & SAFETY AUDIT:")
-    print(f"    - Candidacy Status:      {'CANDIDATE' if tips['is_candidate'] else 'NON-CANDIDATE'}")
+    print(f"  TIPS PRE-PROCEDURE SCREEN:")
+    print(f"    - Contraindication flag: {'NONE SUPPLIED' if tips['is_candidate'] else 'PRESENT'}")
     print(f"    - Safety Risk Tier:      [{tips['risk_level']}]")
     if tips['absolute_contraindications']:
         print("    - Absolute Contraindications:")
@@ -150,6 +151,9 @@ def cmd_evaluate(args):
         pao2_fio2_ratio=args.pf_ratio,
         has_severe_pulm_htn=args.pulm_htn,
         has_severe_heart_failure=args.heart_failure,
+        hrs_no_response_to_albumin=args.hrs_albumin_no_response,
+        hrs_no_shock_or_nephrotoxins=args.hrs_no_shock_nephrotoxins,
+        hrs_no_structural_kidney_signs=args.hrs_no_structural_kidney_signs,
         case_id=args.case_id or "CASE-CIRR-001",
         patient_id=args.patient_id or "PT-HEP-001",
     )
@@ -182,9 +186,9 @@ def cmd_meld(args):
         print(f"  MELD-Na (UNOS 2016):    {result.meld_na}")
         if result.meld_3_0:
             print(f"  MELD 3.0 (OPTN 2023):   {result.meld_3_0}")
-        print(f"  3-Month Mortality:      {result.three_month_mortality_pct}%")
-        print(f"  Allocation Tier:        {result.allocation_tier}")
-        print(f"  Transplant Evaluation:  {'INDICATED (MELD-Na >= 15)' if result.details['transplant_evaluation_indicated'] else 'Monitor'}")
+        print(f"  Legacy mortality band: {result.three_month_mortality_pct}% (historical, not individualized)")
+        print(f"  MELD-Na Band:          {result.allocation_tier}")
+        print(f"  Transplant review flag:{' Consider specialist evaluation' if result.details['transplant_evaluation_indicated'] else ' No score-based flag'}")
         print("=" * 60)
     return 0
 
@@ -216,9 +220,9 @@ def cmd_child_pugh(args):
         print("=" * 60)
         print(f"  Total Score:            {result.total_points} Points")
         print(f"  CTP Class:              Class {result.ctp_class.value}")
-        print(f"  1-Year Survival:        {result.one_year_survival_pct}%")
-        print(f"  2-Year Survival:        {result.two_year_survival_pct}%")
-        print(f"  Perioperative Mortality:{result.perioperative_mortality_pct}%")
+        print(f"  Historical 1-Year:      {result.one_year_survival_pct}%")
+        print(f"  Historical 2-Year:      {result.two_year_survival_pct}%")
+        print(f"  Historical periop fig.: {result.perioperative_mortality_pct}%")
         print(f"\n  Clinical Summary:")
         print(f"  {result.clinical_interpretation}")
         print("=" * 60)
@@ -245,7 +249,7 @@ def cmd_aclf(args):
         print("=" * 60)
         print(f"  ACLF Staging:           {result.aclf_grade_label}")
         print(f"  28-Day Mortality:       {result.twenty_eight_day_mortality_pct}%")
-        print(f"  ICU Admission:          {'MANDATORY' if result.icu_admission_indicated else 'Ward / Step-down'}")
+        print(f"  Higher-acuity flag:     {'YES' if result.icu_admission_indicated else 'No'}")
         print(f"\n  Clinical Management:")
         print(f"  {result.clinical_management_urgency}")
         print("=" * 60)
@@ -256,6 +260,8 @@ def cmd_sbp(args):
     result = evaluate_sbp_protocol(
         ascitic_pmn_count_per_mm3=args.pmn,
         patient_weight_kg=args.weight,
+        serum_creatinine_mg_dl=args.creatinine,
+        total_bilirubin_mg_dl=args.bilirubin,
     )
 
     if args.json:
@@ -265,8 +271,8 @@ def cmd_sbp(args):
         print("  SPONTANEOUS BACTERIAL PERITONITIS (SBP) PROTOCOL")
         print("=" * 60)
         print(f"  Ascitic PMN Count:      {result.ascitic_pmn_count:.0f} / mm³")
-        print(f"  Diagnosis:              {'POSITIVE SBP (PMN >= 250/mm³)' if result.is_sbp_confirmed else 'Negative (< 250/mm³)'}")
-        print(f"  Antibiotic Regimen:     {result.antibiotic_regimen}")
+        print(f"  Threshold:              {'PMN >= 250/mm³ (compatible with SBP)' if result.is_sbp_confirmed else 'PMN < 250/mm³'}")
+        print(f"  Antibiotic note:        {result.antibiotic_regimen}")
         if result.is_sbp_confirmed:
             sch = result.albumin_dosing_schedule
             print(f"  IV Albumin Schedule:")
@@ -286,6 +292,9 @@ def cmd_hrs(args):
         current_creatinine_mg_dl=args.current_cr,
         patient_weight_kg=args.weight,
         has_ascites=not args.no_ascites,
+        no_response_to_48h_albumin_expansion=args.albumin_no_response,
+        no_shock_or_nephrotoxins=args.no_shock_nephrotoxins,
+        no_proteinuria_or_hematuria=args.no_structural_kidney_signs,
     )
 
     if args.json:
@@ -294,7 +303,7 @@ def cmd_hrs(args):
         print("=" * 60)
         print("  HEPATORENAL SYNDROME (HRS-AKI) ICA EVALUATION")
         print("=" * 60)
-        print(f"  HRS-AKI Diagnosis:      {'CONFIRMED' if result.is_hrs_aki_suspected else 'Not Met'}")
+        print(f"  HRS-AKI Screen:         {'POSITIVE — verify clinically' if result.is_hrs_aki_suspected else 'Not positive / incomplete'}")
         print(f"  KDIGO AKI Staging:      Stage {result.kdigo_aki_stage}")
         print(f"  Pharmacotherapy:        {result.first_line_pharmacotherapy}")
         print(f"  Albumin Protocol:       {result.albumin_infusion_plan}")
@@ -320,9 +329,9 @@ def cmd_tips(args):
         print(json.dumps(asdict(result), indent=2, default=str))
     else:
         print("=" * 60)
-        print("  TIPS ELIGIBILITY & PRE-PROCEDURAL SAFETY AUDIT")
+        print("  TIPS PRE-PROCEDURE SCREEN")
         print("=" * 60)
-        print(f"  Candidacy:              {'ELIGIBLE' if result.is_candidate else 'CONTRAINDICATED'}")
+        print(f"  Contraindication flag:  {'NONE SUPPLIED' if result.is_candidate else 'PRESENT'}")
         print(f"  Risk Classification:    [{result.risk_level}]")
         if result.absolute_contraindications:
             print("\n  Absolute Contraindications:")
@@ -343,8 +352,12 @@ def cmd_batch(args):
     if not os.path.exists(args.input):
         print(f"Error: Input file '{args.input}' not found.", file=sys.stderr)
         return 1
-    count = process_batch_csv(args.input, args.output)
-    print(f"Successfully processed {count} cirrhosis records from '{args.input}' -> '{args.output}'.")
+    try:
+        count = process_batch_csv(args.input, args.output)
+    except (ValueError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    print(f"Processed {count} cirrhosis records from '{args.input}' -> '{args.output}'.")
     return 0
 
 
@@ -393,7 +406,7 @@ def cmd_interactive(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="cirrhosis-decompensation-agent",
-        description="Cirrhosis Decompensation, MELD Suite & ACLF Clinical Decision Support Engine",
+        description="Cirrhosis scoring and decompensation assessment utilities",
     )
     parser.add_argument("--json", action="store_true", help="Output results in JSON format")
 
@@ -417,6 +430,9 @@ def main(argv=None):
     p_eval.add_argument("--pf-ratio", type=float, help="PaO2/FiO2 ratio")
     p_eval.add_argument("--pulm-htn", action="store_true", help="Severe pulmonary HTN")
     p_eval.add_argument("--heart-failure", action="store_true", help="Severe heart failure")
+    p_eval.add_argument("--hrs-albumin-no-response", action="store_true", help="Explicitly confirm no response to albumin/diuretic withdrawal assessment")
+    p_eval.add_argument("--hrs-no-shock-nephrotoxins", action="store_true", help="Explicitly confirm no shock or nephrotoxic-drug explanation")
+    p_eval.add_argument("--hrs-no-structural-kidney-signs", action="store_true", help="Explicitly confirm no supplied signs of structural kidney disease")
     p_eval.add_argument("--case-id", help="Case ID")
     p_eval.add_argument("--patient-id", help="Patient ID")
 
@@ -453,6 +469,8 @@ def main(argv=None):
     p_sbp = subparsers.add_parser("sbp", help="Evaluate SBP criteria & Sort Albumin protocol")
     p_sbp.add_argument("--pmn", type=float, required=True, help="Ascitic PMN count / mm³")
     p_sbp.add_argument("--weight", type=float, required=True, help="Patient weight in kg")
+    p_sbp.add_argument("--creatinine", type=float, default=1.0, help="Serum creatinine (mg/dL); retained for context")
+    p_sbp.add_argument("--bilirubin", type=float, default=2.0, help="Total bilirubin (mg/dL); retained for context")
 
     # HRS
     p_hrs = subparsers.add_parser("hrs", help="Evaluate HRS-AKI criteria & Terlipressin regimen")
@@ -460,6 +478,9 @@ def main(argv=None):
     p_hrs.add_argument("--current-cr", type=float, required=True, help="Current Creatinine (mg/dL)")
     p_hrs.add_argument("--weight", type=float, required=True, help="Weight in kg")
     p_hrs.add_argument("--no-ascites", action="store_true", help="Set if ascites absent")
+    p_hrs.add_argument("--albumin-no-response", action="store_true", help="Confirm no response to albumin/diuretic withdrawal assessment")
+    p_hrs.add_argument("--no-shock-nephrotoxins", action="store_true", help="Confirm no shock or nephrotoxic-drug explanation")
+    p_hrs.add_argument("--no-structural-kidney-signs", action="store_true", help="Confirm no supplied signs of structural kidney disease")
 
     # TIPS
     p_tips = subparsers.add_parser("tips", help="Evaluate TIPS eligibility and contraindications")
