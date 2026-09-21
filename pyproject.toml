@@ -1,27 +1,39 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cirrhosis-decompensation-engine"
-version = "2.0.0"
-description = "CirrhoMind: MELD 3.0, Variceal Bleed & Hepatorenal Syndrome (HRS-AKI) Engine"
+name = "cirrhosis-decompensation-agent"
+version = "2.1.0"
+description = "Cirrhosis scoring and decompensation assessment utilities"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
 license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-requires-python = ">=3.9"
-dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2",
+    "pytest>=8",
+    "ruff>=0.6",
+]
 
 [project.scripts]
-cirrhosis-decompensation-engine = "cirrhosis_decompensation_agent.cli:main"
+cirrhosis-decompensation = "cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/cirrhosis-decompensation-engine"
-Repository = "https://github.com/abusuraihsakhri/cirrhosis-decompensation-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/cirrhosis-decompensation-agent"
+Repository = "https://github.com/abusuraihsakhri/cirrhosis-decompensation-agent.git"
+
+[tool.setuptools]
+py-modules = ["cirrhosis_decompensation", "cli"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
