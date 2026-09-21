@@ -178,7 +178,7 @@ def cmd_meld(args):
         print(json.dumps(asdict(result), indent=2, default=str))
     else:
         print("=" * 60)
-        print("  MELD SCORE SUITE (UNOS / OPTN GUIDELINES)")
+        print("  MELD SCORE REFERENCE CALCULATIONS")
         print("=" * 60)
         print(f"  Original MELD (2002):   {result.original_meld}")
         print(f"  MELD-Na (UNOS 2016):    {result.meld_na}")
@@ -411,7 +411,7 @@ def main(argv=None):
     subparsers = parser.add_subparsers(dest="command")
 
     # Evaluate
-    p_eval = subparsers.add_parser("evaluate", help="Comprehensive multi-system cirrhosis audit")
+    p_eval = subparsers.add_parser("evaluate", help="Calculate cirrhosis scores and screening flags")
     p_eval.add_argument("--cr", type=float, required=True, help="Serum Creatinine (mg/dL)")
     p_eval.add_argument("--bili", type=float, required=True, help="Total Bilirubin (mg/dL)")
     p_eval.add_argument("--inr", type=float, required=True, help="INR")
@@ -464,14 +464,14 @@ def main(argv=None):
     p_aclf.add_argument("--pf-ratio", type=float, help="PaO2 / FiO2 ratio")
 
     # SBP
-    p_sbp = subparsers.add_parser("sbp", help="Evaluate SBP criteria & Sort Albumin protocol")
+    p_sbp = subparsers.add_parser("sbp", help="Check the SBP PMN threshold and reference albumin calculation")
     p_sbp.add_argument("--pmn", type=float, required=True, help="Ascitic PMN count / mm³")
     p_sbp.add_argument("--weight", type=float, required=True, help="Patient weight in kg")
     p_sbp.add_argument("--creatinine", type=float, default=1.0, help="Serum creatinine (mg/dL); retained for context")
     p_sbp.add_argument("--bilirubin", type=float, default=2.0, help="Total bilirubin (mg/dL); retained for context")
 
     # HRS
-    p_hrs = subparsers.add_parser("hrs", help="Evaluate HRS-AKI criteria & Terlipressin regimen")
+    p_hrs = subparsers.add_parser("hrs", help="Screen supplied criteria for HRS-AKI compatibility")
     p_hrs.add_argument("--baseline-cr", type=float, required=True, help="Baseline Creatinine (mg/dL)")
     p_hrs.add_argument("--current-cr", type=float, required=True, help="Current Creatinine (mg/dL)")
     p_hrs.add_argument("--weight", type=float, required=True, help="Weight in kg")
@@ -481,7 +481,7 @@ def main(argv=None):
     p_hrs.add_argument("--no-structural-kidney-signs", action="store_true", help="Confirm no supplied signs of structural kidney disease")
 
     # TIPS
-    p_tips = subparsers.add_parser("tips", help="Evaluate TIPS eligibility and contraindications")
+    p_tips = subparsers.add_parser("tips", help="Screen supplied TIPS risk and contraindication flags")
     p_tips.add_argument("--meld", type=int, required=True, help="MELD-Na score")
     p_tips.add_argument("--bili", type=float, required=True, help="Total Bilirubin (mg/dL)")
     p_tips.add_argument("--cr", type=float, required=True, help="Serum Creatinine (mg/dL)")
