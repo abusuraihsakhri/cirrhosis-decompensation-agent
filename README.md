@@ -20,11 +20,11 @@ Reference calculators and screening utilities for common cirrhosis and acute-dec
 
 ## Browser application
 
-Open the live application, enter the laboratory and clinical values, and select **Analyze**. The Python module is loaded into a Web Worker through Pyodide so calculations run locally without blocking the page.
+Open the live application, enter the laboratory and clinical values, and select **Analyze**. The Python module is loaded into a Web Worker through a self-hosted Pyodide runtime so calculations run locally without blocking the page.
 
-Patient values entered in the browser are not submitted to this repository or to an application server. The page loads the Pyodide runtime from jsDelivr, so normal network requests for those static runtime assets still occur.
+Patient values entered in the browser are not submitted to this repository or to an application server. The Pyodide runtime is bundled into the GitHub Pages deployment and served from the same site origin.
 
-The interface is intended for current desktop and mobile browsers with WebAssembly and Web Worker support. An internet connection is required when the Pyodide runtime is not already cached.
+The interface is intended for current desktop and mobile browsers with WebAssembly and Web Worker support. An internet connection is required to open the hosted application, but the browser no longer depends on a third-party CDN to load the Python runtime.
 
 ## CLI
 
