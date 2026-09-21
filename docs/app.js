@@ -5,7 +5,7 @@ const form = $("calculatorForm");
 const analyzeBtn = $("analyzeBtn");
 const statusEl = $("runtimeStatus");
 const errorBox = $("errorBox");
-const worker = new Worker("./worker.js");
+const worker = new Worker("./worker.js?v=20260921-2");
 
 function numberOrNull(id) {
   const value = $(id).value.trim();
@@ -124,7 +124,7 @@ worker.addEventListener("message", (event) => {
 
 worker.addEventListener("error", () => {
   statusEl.textContent = "Runtime failed";
-  showError("Python runtime failed to load. Check your network connection and reload the page.");
+  showError("Python runtime failed to load. Reload the page to fetch the latest bundled runtime.");
 });
 
 form.addEventListener("submit", (event) => {
