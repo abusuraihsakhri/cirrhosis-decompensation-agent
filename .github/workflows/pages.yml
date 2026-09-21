@@ -2,7 +2,7 @@ name: Deploy Pages
 
 on:
   push:
-    branches: [ master, "audit/repo-043" ]
+    branches: [ master ]
   workflow_dispatch:
 
 permissions:
