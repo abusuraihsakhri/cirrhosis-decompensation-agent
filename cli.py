@@ -24,8 +24,6 @@ from cirrhosis_decompensation import (
     CirrhosisDecompensationEngine,
     AscitesDegree,
     EncephalopathyGrade,
-    ChildPughClass,
-    ACLFGrade,
     evaluate_meld_suite,
     calculate_child_pugh,
     evaluate_clif_aclf,
@@ -46,7 +44,7 @@ def format_cirrhosis_dossier_display(dossier):
     print("-" * 80)
 
     m = d['meld_suite']
-    print(f"  MELD SUITE:")
+    print("  MELD SUITE:")
     print(f"    - Original MELD (2002):  {m['original_meld']}")
     print(f"    - MELD-Na (UNOS 2016):   {m['meld_na']}")
     print(f"    - Legacy MELD mortality band: {m['three_month_mortality_pct']}% (not individualized)")
@@ -56,7 +54,7 @@ def format_cirrhosis_dossier_display(dossier):
     print("-" * 80)
 
     ctp = d['child_pugh']
-    print(f"  CHILD-TURCOTTE-PUGH (CTP):")
+    print("  CHILD-TURCOTTE-PUGH (CTP):")
     print(f"    - Class & Score:         Class {ctp['ctp_class']} ({ctp['total_points']} points)")
     print(f"    - Historical estimates:  1-Year: {ctp['one_year_survival_pct']}% | 2-Year: {ctp['two_year_survival_pct']}%")
     print(f"    - Historical perioperative figure: {ctp['perioperative_mortality_pct']}%")
@@ -64,7 +62,7 @@ def format_cirrhosis_dossier_display(dossier):
     print("-" * 80)
 
     aclf = d['aclf_status']
-    print(f"  EASL-CLIF ACLF STATUS:")
+    print("  EASL-CLIF ACLF STATUS:")
     print(f"    - Staging / Grade:       {aclf['aclf_grade_label']}")
     print(f"    - 28-Day Mortality:      {aclf['twenty_eight_day_mortality_pct']}%")
     print(f"    - Higher-acuity flag:    {'YES' if aclf['icu_admission_indicated'] else 'No'}")
@@ -77,7 +75,7 @@ def format_cirrhosis_dossier_display(dossier):
 
     if d.get('sbp_protocol'):
         sbp = d['sbp_protocol']
-        print(f"  SPONTANEOUS BACTERIAL PERITONITIS (SBP):")
+        print("  SPONTANEOUS BACTERIAL PERITONITIS (SBP):")
         print(f"    - SBP Confirmed:         {'POSITIVE (PMN >= 250/mm³)' if sbp['is_sbp_confirmed'] else 'Negative'}")
         print(f"    - Ascitic PMN:           {sbp['ascitic_pmn_count']:.0f} / mm³")
         print(f"    - Antibiotic Regimen:    {sbp['antibiotic_regimen']}")
@@ -88,7 +86,7 @@ def format_cirrhosis_dossier_display(dossier):
 
     if d.get('hrs_aki_protocol'):
         hrs = d['hrs_aki_protocol']
-        print(f"  HEPATORENAL SYNDROME (HRS-AKI):")
+        print("  HEPATORENAL SYNDROME (HRS-AKI):")
         print(f"    - HRS-AKI Screen:        {'POSITIVE (verify clinically)' if hrs['is_hrs_aki_suspected'] else 'Not positive / incomplete'}")
         print(f"    - KDIGO AKI Stage:       Stage {hrs['kdigo_aki_stage']}")
         print(f"    - First-Line Therapy:    {hrs['first_line_pharmacotherapy']}")
@@ -96,7 +94,7 @@ def format_cirrhosis_dossier_display(dossier):
         print("-" * 80)
 
     tips = d['tips_eligibility']
-    print(f"  TIPS PRE-PROCEDURE SCREEN:")
+    print("  TIPS PRE-PROCEDURE SCREEN:")
     print(f"    - Contraindication flag: {'NONE SUPPLIED' if tips['is_candidate'] else 'PRESENT'}")
     print(f"    - Safety Risk Tier:      [{tips['risk_level']}]")
     if tips['absolute_contraindications']:
@@ -223,7 +221,7 @@ def cmd_child_pugh(args):
         print(f"  Historical 1-Year:      {result.one_year_survival_pct}%")
         print(f"  Historical 2-Year:      {result.two_year_survival_pct}%")
         print(f"  Historical periop fig.: {result.perioperative_mortality_pct}%")
-        print(f"\n  Clinical Summary:")
+        print("\n  Clinical Summary:")
         print(f"  {result.clinical_interpretation}")
         print("=" * 60)
     return 0
@@ -250,7 +248,7 @@ def cmd_aclf(args):
         print(f"  ACLF Staging:           {result.aclf_grade_label}")
         print(f"  28-Day Mortality:       {result.twenty_eight_day_mortality_pct}%")
         print(f"  Higher-acuity flag:     {'YES' if result.icu_admission_indicated else 'No'}")
-        print(f"\n  Clinical Management:")
+        print("\n  Clinical Management:")
         print(f"  {result.clinical_management_urgency}")
         print("=" * 60)
     return 0
@@ -275,7 +273,7 @@ def cmd_sbp(args):
         print(f"  Antibiotic note:        {result.antibiotic_regimen}")
         if result.is_sbp_confirmed:
             sch = result.albumin_dosing_schedule
-            print(f"  IV Albumin Schedule:")
+            print("  IV Albumin Schedule:")
             print(f"    - Day 1 (1.5 g/kg):   {sch['day_1_grams']} g (within 6h)")
             print(f"    - Day 3 (1.0 g/kg):   {sch['day_3_grams']} g")
             print(f"    - Total Dose:         {sch['total_albumin_grams']} g")
@@ -498,7 +496,7 @@ def main(argv=None):
     p_batch.add_argument("-o", "--output", default="cirrhosis_results.csv", help="Output CSV file")
 
     # Interactive
-    p_inter = subparsers.add_parser("interactive", help="Interactive clinical wizard")
+    subparsers.add_parser("interactive", help="Interactive clinical wizard")
 
     args = parser.parse_args(argv)
 
