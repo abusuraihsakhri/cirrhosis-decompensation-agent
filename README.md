@@ -1,57 +1,95 @@
-# Cirrhosis Decompensation, MELD Suite & ACLF Clinical Decision Support Engine
+# Cirrhosis Decompensation Agent
 
-> **Domain:** Hepatology, Critical Care Gastroenterology & Liver Transplantation  
-> **Clinical Guidelines & Standards:** AASLD 2021 Practice Guidance on Prevention and Management of Cirrhosis Complications, EASL Clinical Practice Guidelines on Decompensated Cirrhosis (2018), OPTN MELD 3.0 Policy, EASL-CLIF Consortium ACLF Definitions, International Club of Ascites (ICA) HRS-AKI Diagnostic Criteria
+### [Open the Live Application →](https://abusuraihsakhri.github.io/cirrhosis-decompensation-agent/)
 
----
+Reference calculators and screening utilities for common cirrhosis and acute-decompensation assessments. The same Python calculation module is available through a command-line interface and runs in the browser through Pyodide.
 
-## 📖 Clinical Overview
+> **Clinical-use note:** This project is for reference, education, and software validation. It is not an official OPTN calculator and does not establish a diagnosis, transplant status, treatment plan, or TIPS candidacy. Use current local guidance and clinical judgment for patient care.
 
-The **Cirrhosis Decompensation Agent** provides multi-dimensional clinical decision support for patients experiencing acute decompensation of cirrhosis. It computes the entire MELD family (Original MELD, MELD-Na, and MELD 3.0 with female sex coefficient and serum albumin integration), grades Child-Turcotte-Pugh status, diagnoses and protocols Spontaneous Bacterial Peritonitis (SBP ascitic PMN $\ge 250/\mu\text{L}$ with Sort Albumin dosing), stages Hepatorenal Syndrome (HRS-AKI with Terlipressin/Albumin protocols), audits EASL-CLIF Acute-on-Chronic Liver Failure (ACLF Grades 1–3), and screens transjugular intrahepatic portosystemic shunt (TIPS) candidacy.
+## Features
 
-### Key Clinical Protocols & Formulas
+- Original MELD, MELD-Na, and adult MELD 3.0 reference calculations
+- Child-Turcotte-Pugh score and class
+- EASL-CLIF-style ACLF organ-failure staging implemented by this repository
+- SBP ascitic PMN threshold check with reference albumin calculation
+- HRS-AKI screening from explicitly supplied AKI/exclusion criteria
+- TIPS pre-procedure risk and contraindication flags
+- Single-case CLI commands and CSV batch processing
+- Responsive browser interface with light/dark themes
+- In-browser Python execution; no application backend is required
 
-#### 1. MELD 3.0 Formula (OPTN/UNOS 2023 Implementation)
-$$\begin{aligned}
-\text{MELD 3.0} = & 1.33 \times (\text{Female}) + [4.56 \times \ln(\text{Bilirubin})] + [0.82 \times (137 - \text{Na})] - [0.24 \times (137 - \text{Na}) \times \ln(\text{Bilirubin})] \\
-& + [9.09 \times \ln(\text{INR})] + [11.14 \times \ln(\text{Creatinine})] + [1.85 \times (3.5 - \text{Albumin})] - [1.83 \times (3.5 - \text{Albumin}) \times \ln(\text{Creatinine})] + 6.64
-\end{aligned}$$
-*(Upper limit capped at 40; variables bound to physiological boundaries).*
+## Browser application
 
-#### 2. Acute Complication Management Protocols
-- **Spontaneous Bacterial Peritonitis (SBP):** Ascitic PMN $\ge 250/\mu\text{L} \implies$ 3rd-gen cephalosporin (Cefotaxime 2g IV q8h) + IV Albumin ($1.5\,\text{g/kg}$ within 6 hours, $1.0\,\text{g/kg}$ on Day 3).
-- **HRS-AKI Protocol:** ICA-AKI criteria met without response to 48h diuretic cessation and albumin volume expansion $\implies$ Terlipressin (1 mg IV bolus q4-6h) + Albumin ($20 - 40\,\text{g/day}$).
-- **EASL-CLIF ACLF Classification:** Evaluates failure across 6 organ systems (Liver, Kidney, Brain, Coagulation, Circulation, Respiration) grading ACLF 1 through 3 with ICU allocation alerts.
+Open the live application, enter the laboratory and clinical values, and select **Analyze**. The Python module is loaded into a Web Worker through Pyodide so calculations run locally without blocking the page.
 
----
+Patient values entered in the browser are not submitted to this repository or to an application server. The page loads the Pyodide runtime from jsDelivr, so normal network requests for those static runtime assets still occur.
 
-## 💻 CLI Quickstart & Usage
+The interface is intended for current desktop and mobile browsers with WebAssembly and Web Worker support. An internet connection is required when the Pyodide runtime is not already cached.
 
-### 1. Comprehensive Decompensation Audit
+## CLI
+
+Python 3.9 or later is supported.
+
 ```bash
-python cli.py evaluate --cr 1.9 --bili 3.8 --inr 1.8 --na 131.0 --albumin 2.7 --female --ascites moderate --he 1 --pmn 280
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 ```
 
-### 2. Isolated MELD Suite Calculation
+Examples:
+
 ```bash
-python cli.py meld --cr 2.4 --bili 5.8 --inr 2.2 --na 127.0 --albumin 2.4 --female
+cirrhosis-decompensation meld \
+  --cr 2.4 --bili 5.8 --inr 2.2 --na 127 --alb 2.4 --female
+
+cirrhosis-decompensation evaluate \
+  --cr 1.9 --bili 3.8 --inr 1.8 --na 131 --alb 2.7 \
+  --weight 70 --ascites moderate --he 1 --pmn 280
+
+cirrhosis-decompensation sbp --pmn 420 --weight 68
+
+cirrhosis-decompensation hrs \
+  --baseline-cr 1.0 --current-cr 2.2 --weight 70 \
+  --albumin-no-response --no-shock-nephrotoxins \
+  --no-structural-kidney-signs
+
+cirrhosis-decompensation batch -i sample.csv -o results.csv
 ```
 
-### 3. SBP Paracentesis Evaluation
+Run `cirrhosis-decompensation --help` or a subcommand with `--help` for all available inputs.
+
+### Batch CSV
+
+Batch processing requires numeric creatinine, bilirubin, INR, sodium, albumin, and weight values (accepted column aliases are defined in `process_batch_csv`). Missing required laboratory values are rejected rather than silently replaced with defaults.
+
+`sample.csv` provides an example input layout.
+
+## Development and verification
+
+Install the development tools and run the same checks used by CI:
+
 ```bash
-python cli.py sbp --pmn 420 --weight 68.0 --creatinine 2.4 --bilirubin 5.8
+python -m pip install -e ".[dev]"
+ruff check .
+pytest -q
+python -m build
+python -m compileall -q cirrhosis_decompensation.py cli.py
+node --check docs/app.js
+node --check docs/worker.js
 ```
 
-### 4. Batch Process Cirrhosis Cohort CSV
-```bash
-python cli.py batch -i sample.csv -o out_results.csv
-```
+GitHub Actions tests Python 3.9, 3.10, 3.11, 3.12, and 3.13. The Pages workflow packages the static browser application from `docs/` together with the Python calculation module.
 
----
+## Technical notes
 
-## 🧪 Verification & Testing
+The core calculation code uses the Python standard library only. The browser layer is plain HTML, CSS, and JavaScript plus Pyodide. Results are rendered with DOM text nodes rather than injected HTML.
 
-Execute comprehensive unit tests via pytest:
-```bash
-python -m pytest -p no:zarr
-```
+MELD-related allocation policy changes over time. For current U.S. allocation calculations and policy context, use the official HRSA/OPTN resources:
+
+- [HRSA/OPTN MELD calculator](https://www.hrsa.gov/optn/data-calculators/allocation-calculators/meld-calculator)
+- [North American practice-based TIPS recommendations](https://pmc.ncbi.nlm.nih.gov/articles/PMC8760361/)
+- [Pyodide deployment documentation](https://pyodide.org/en/stable/usage/downloading-and-deploying.html)
+
+## License
+
+MIT. See [LICENSE](LICENSE).
