@@ -245,7 +245,7 @@ class TestAcuteDecompensationProtocols(unittest.TestCase):
         self.assertEqual(res.albumin_dosing_schedule["day_1_grams"], 105.0)
         self.assertEqual(res.albumin_dosing_schedule["day_3_grams"], 70.0)
         self.assertEqual(res.albumin_dosing_schedule["total_albumin_grams"], 175.0)
-        self.assertIn("Ceftriaxone", res.antibiotic_regimen)
+        self.assertIn("local SBP guidance", res.antibiotic_regimen)
 
     def test_sbp_negative(self):
         res = evaluate_sbp_protocol(ascitic_pmn_count_per_mm3=120.0, patient_weight_kg=70.0)
@@ -264,7 +264,7 @@ class TestAcuteDecompensationProtocols(unittest.TestCase):
         )
         self.assertTrue(res.is_hrs_aki_suspected)
         self.assertEqual(res.kdigo_aki_stage, 2)
-        self.assertIn("Terlipressin", res.first_line_pharmacotherapy)
+        self.assertIn("vasoconstrictor", res.first_line_pharmacotherapy)
 
     def test_tips_contraindicated_pulmonary_hypertension(self):
         res = evaluate_tips_eligibility(
@@ -286,7 +286,7 @@ class TestAcuteDecompensationProtocols(unittest.TestCase):
             inr=1.2,
         )
         self.assertTrue(res.is_candidate)
-        self.assertEqual(res.risk_level, "FAVORABLE CANDIDATE")
+        self.assertEqual(res.risk_level, "NO LISTED HIGH-RISK FEATURE")
 
 
 class TestMasterEngineAndBatch(unittest.TestCase):
@@ -384,7 +384,7 @@ class TestMasterEngineAndBatch(unittest.TestCase):
             has_congestive_heart_failure=True,
         )
         self.assertFalse(res.is_candidate)
-        self.assertEqual(res.risk_level, "CONTRAINDICATED")
+        self.assertEqual(res.risk_level, "ABSOLUTE CONTRAINDICATION FLAG")
     def test_batch_csv_processing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             in_csv = os.path.join(tmpdir, "cirrhosis_input.csv")
