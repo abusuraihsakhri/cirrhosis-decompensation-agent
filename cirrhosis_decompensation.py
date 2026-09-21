@@ -13,11 +13,10 @@ Implemented calculations:
 1. MELD Scoring Suite: Original MELD (2002), MELD-Na (UNOS 2016), and MELD 3.0 (2023)
 2. Child-Turcotte-Pugh (Child-Pugh / CTP) Score & Classification (Class A, B, C)
 3. EASL-CLIF Acute-on-Chronic Liver Failure (ACLF) Staging (Grades 0, 1, 2, 3)
-4. Acute Decompensation Protocols:
-   - Spontaneous Bacterial Peritonitis (SBP) diagnostic criteria & Sort Albumin protocol
-   - Hepatorenal Syndrome (HRS-AKI) diagnostic criteria & Terlipressin/Albumin dosing
-   - Acute Variceal Bleeding (AVB) restrictive transfusion & vasoactive infusion protocols
-   - Hepatic Encephalopathy (HE) West Haven grading & Lactulose/Rifaximin titration
+4. Acute decompensation reference checks:
+   - Spontaneous Bacterial Peritonitis (SBP) PMN threshold and albumin calculation
+   - Hepatorenal Syndrome–AKI (HRS-AKI) screening from supplied criteria
+   - Hepatic encephalopathy represented by West Haven grade
 5. TIPS (Transjugular Intrahepatic Portosystemic Shunt) pre-procedure screening
 
 Stdlib only — no external dependencies.
@@ -834,9 +833,9 @@ class CirrhosisDecompensationEngine:
         # Clinical Alerts
         alerts = []
         if aclf_res.aclf_grade.value >= 1:
-            alerts.append(f"ACLF ALERT: Patient meets criteria for {aclf_res.aclf_grade_label} (28-day mortality {aclf_res.twenty_eight_day_mortality_pct}%).")
+            alerts.append(f"ACLF FLAG: {aclf_res.aclf_grade_label}; the associated mortality figure is a cohort-level reference, not an individualized prognosis.")
         if meld_res.meld_na >= 25:
-            alerts.append(f"HIGH MELD ALERT: MELD-Na of {meld_res.meld_na} indicates severe hepatic dysfunction (90-day mortality {meld_res.three_month_mortality_pct}%).")
+            alerts.append(f"HIGH MELD FLAG: MELD-Na is {meld_res.meld_na}; review the full hepatology and transplant context. Calculated MELD does not establish listing status.")
         if sbp_res and sbp_res.is_sbp_confirmed:
             alerts.append(f"SBP THRESHOLD FLAG: Ascitic PMN count ({sbp_res.ascitic_pmn_count:.0f}/mm³) is >= 250/mm³; review for SBP and secondary peritonitis in clinical context.")
         if hrs_res and hrs_res.is_hrs_aki_suspected:
