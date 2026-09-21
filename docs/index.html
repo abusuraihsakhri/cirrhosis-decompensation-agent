@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Browser-based cirrhosis scoring utilities for MELD, Child-Pugh and CLIF-ACLF reference calculations.">
+  <title>Cirrhosis Decompensation Calculator</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Hepatology reference calculator</p>
+      <h1>Cirrhosis Decompensation</h1>
+    </div>
+    <div class="header-actions">
+      <span id="runtimeStatus" class="status" role="status" aria-live="polite">Loading Python…</span>
+      <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle dark mode">◐</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="panel input-panel" aria-labelledby="inputHeading">
+      <div class="section-heading">
+        <div>
+          <h2 id="inputHeading">Patient inputs</h2>
+          <p>Enter current laboratory and clinical values.</p>
+        </div>
+        <button id="exampleBtn" class="text-button" type="button">Example</button>
+      </div>
+
+      <form id="calculatorForm">
+        <div class="field-grid">
+          <label>Creatinine <span>mg/dL</span><input id="creatinine" name="creatinine" type="number" min="0.01" step="0.01" value="1.8" required></label>
+          <label>Bilirubin <span>mg/dL</span><input id="bilirubin" name="bilirubin" type="number" min="0.01" step="0.01" value="3.2" required></label>
+          <label>INR <input id="inr" name="inr" type="number" min="0.01" step="0.01" value="1.7" required></label>
+          <label>Sodium <span>mmol/L</span><input id="sodium" name="sodium" type="number" min="1" step="0.1" value="131" required></label>
+          <label>Albumin <span>g/dL</span><input id="albumin" name="albumin" type="number" min="0.01" step="0.01" value="2.6" required></label>
+          <label>Weight <span>kg</span><input id="weight" name="weight" type="number" min="0.1" step="0.1" value="72" required></label>
+        </div>
+
+        <div class="compact-grid">
+          <label>Ascites
+            <select id="ascites" name="ascites">
+              <option value="none">None</option>
+              <option value="mild_controlled">Mild / controlled</option>
+              <option value="moderate_severe_refractory" selected>Moderate / severe / refractory</option>
+            </select>
+          </label>
+          <label>Encephalopathy
+            <select id="he" name="he">
+              <option value="0">Grade 0</option>
+              <option value="1">Grade 1</option>
+              <option value="2" selected>Grade 2</option>
+              <option value="3">Grade 3</option>
+              <option value="4">Grade 4</option>
+            </select>
+          </label>
+          <label>Ascitic PMN <span>/mm³</span><input id="pmn" name="pmn" type="number" min="0" step="1" value="400"></label>
+          <label>Baseline creatinine <span>mg/dL</span><input id="baselineCr" name="baselineCr" type="number" min="0.01" step="0.01" value="1.0"></label>
+        </div>
+
+        <details class="advanced">
+          <summary>Additional clinical flags</summary>
+          <div class="checks">
+            <label><input id="female" type="checkbox"> Female (adult MELD 3.0)</label>
+            <label><input id="dialysis" type="checkbox"> Dialysis/RRT criteria</label>
+            <label><input id="vasopressors" type="checkbox"> Vasopressors required</label>
+            <label><input id="pulmHtn" type="checkbox"> Severe pulmonary hypertension</label>
+            <label><input id="heartFailure" type="checkbox"> Severe heart failure</label>
+          </div>
+          <div class="field-grid advanced-fields">
+            <label>PaO₂/FiO₂ <span>optional</span><input id="pfRatio" type="number" min="1" step="1"></label>
+          </div>
+          <p class="subheading">HRS-AKI screening exclusions — check only when explicitly established</p>
+          <div class="checks">
+            <label><input id="hrsAlbumin" type="checkbox"> No response after volume/diuretic assessment</label>
+            <label><input id="hrsNoShock" type="checkbox"> No shock or nephrotoxic explanation</label>
+            <label><input id="hrsNoStructural" type="checkbox"> No supplied signs of structural kidney disease</label>
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button id="analyzeBtn" class="primary" type="submit" disabled>Analyze</button>
+          <button id="resetBtn" class="secondary" type="button">Reset</button>
+        </div>
+      </form>
+
+      <p class="disclaimer">Reference/educational use only. This page is not an official OPTN calculator and does not establish a diagnosis, transplant status, treatment plan, or TIPS eligibility.</p>
+    </section>
+
+    <section class="panel result-panel" aria-labelledby="resultsHeading">
+      <div class="section-heading">
+        <div>
+          <h2 id="resultsHeading">Results</h2>
+          <p id="resultHint">Run the calculation to populate results.</p>
+        </div>
+      </div>
+      <div id="errorBox" class="error" role="alert" hidden></div>
+      <div id="resultGrid" class="result-grid" aria-live="polite">
+        <article class="metric-card"><span>MELD 3.0</span><strong id="meld3">—</strong><small id="meldBand">Awaiting input</small></article>
+        <article class="metric-card"><span>MELD-Na</span><strong id="meldNa">—</strong><small id="meldOriginal">Original MELD —</small></article>
+        <article class="metric-card"><span>Child-Pugh</span><strong id="childClass">—</strong><small id="childPoints">— points</small></article>
+        <article class="metric-card"><span>CLIF-ACLF</span><strong id="aclfGrade">—</strong><small id="organFailures">— organ failures</small></article>
+      </div>
+      <div class="detail-grid">
+        <article class="detail-card"><h3>SBP threshold</h3><p id="sbpResult">Not calculated.</p></article>
+        <article class="detail-card"><h3>HRS-AKI screen</h3><p id="hrsResult">Not calculated.</p></article>
+        <article class="detail-card"><h3>TIPS screen</h3><p id="tipsResult">Not calculated.</p></article>
+        <article class="detail-card"><h3>Clinical flags</h3><ul id="alertsList"><li>No result yet.</li></ul></article>
+      </div>
+      <p class="privacy-note">Inputs are processed locally in your browser. No patient values are sent to this repository or a server.</p>
+    </section>
+  </main>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
