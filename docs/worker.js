@@ -1,27 +1,37 @@
 "use strict";
 
-const PYODIDE_BASE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
+const PYODIDE_BASE = new URL("./pyodide/", self.location.href).href;
 let pyodide;
 
 async function initialize() {
-  importScripts(PYODIDE_BASE + "pyodide.js");
+  importScripts(new URL("pyodide.js", PYODIDE_BASE).href);
   pyodide = await loadPyodide({ indexURL: PYODIDE_BASE });
+
   const response = await fetch("./cirrhosis_decompensation.py", { cache: "no-store" });
-  if (!response.ok) throw new Error("Unable to load calculator module.");
+  if (!response.ok) {
+    throw new Error("Unable to load calculator module.");
+  }
+
   pyodide.runPython(await response.text());
   self.postMessage({ type: "ready" });
 }
 
 const ready = initialize().catch((error) => {
-  self.postMessage({ type: "error", message: String(error?.message || error) });
+  const detail = String(error?.message || error);
+  self.postMessage({
+    type: "error",
+    message: "Bundled Python runtime failed to load. Reload the page after the latest deployment. " + detail
+  });
   throw error;
 });
 
 self.addEventListener("message", async (event) => {
   if (event.data?.type !== "calculate") return;
+
   try {
     await ready;
     pyodide.globals.set("payload_json", JSON.stringify(event.data.payload));
+
     const resultJson = pyodide.runPython(`
 import json
 from dataclasses import asdict
@@ -49,6 +59,7 @@ dossier = engine.evaluate_patient_case(
     hrs_no_shock_or_nephrotoxins=p["hrs_no_shock_nephrotoxins"],
     hrs_no_structural_kidney_signs=p["hrs_no_structural_kidney_signs"],
 )
+
 out = {
     "meld": asdict(dossier.meld_suite),
     "child_pugh": asdict(dossier.child_pugh),
@@ -58,8 +69,10 @@ out = {
     "tips": asdict(dossier.tips_eligibility),
     "alerts": dossier.clinical_alerts,
 }
+
 json.dumps(out, default=lambda x: x.value if hasattr(x, "value") else str(x))
 `);
+
     self.postMessage({ type: "result", data: JSON.parse(resultJson) });
   } catch (error) {
     self.postMessage({ type: "error", message: String(error?.message || error) });
