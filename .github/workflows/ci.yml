@@ -37,6 +37,13 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      - name: Check browser assets
+        run: |
+          node --check docs/app.js
+          node --check docs/worker.js
+          test -f docs/index.html
+          grep -q 'id="analyzeBtn"' docs/index.html
+
       - name: Run tests
         run: pytest -q
 
