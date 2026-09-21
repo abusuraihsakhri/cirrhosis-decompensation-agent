@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Cirrhosis Decompensation & Acute-on-Chronic Liver Failure (ACLF) Clinical Engine
-================================================================================
-Comprehensive clinical decision support module for hepatology and gastroenterology,
-implementing standard international clinical formulas and consensus guidelines:
+Cirrhosis decompensation scoring and assessment utilities
+==========================================================
+Deterministic reference calculations for hepatology-related scores and screening
+criteria based on published formulas and consensus definitions:
 - AASLD (American Association for the Study of Liver Diseases)
 - EASL (European Association for the Study of the Liver)
 - UNOS / OPTN (Organ Procurement and Transplantation Network)
 - ICA (International Club of Ascites)
 
-Core Analytical Engines:
+Implemented calculations:
 1. MELD Scoring Suite: Original MELD (2002), MELD-Na (UNOS 2016), and MELD 3.0 (2023)
 2. Child-Turcotte-Pugh (Child-Pugh / CTP) Score & Classification (Class A, B, C)
 3. EASL-CLIF Acute-on-Chronic Liver Failure (ACLF) Staging (Grades 0, 1, 2, 3)
@@ -18,7 +18,7 @@ Core Analytical Engines:
    - Hepatorenal Syndrome (HRS-AKI) diagnostic criteria & Terlipressin/Albumin dosing
    - Acute Variceal Bleeding (AVB) restrictive transfusion & vasoactive infusion protocols
    - Hepatic Encephalopathy (HE) West Haven grading & Lactulose/Rifaximin titration
-5. TIPS (Transjugular Intrahepatic Portosystemic Shunt) Eligibility & Safety Scorer
+5. TIPS (Transjugular Intrahepatic Portosystemic Shunt) pre-procedure screening
 
 Stdlib only — no external dependencies.
 """
@@ -150,7 +150,7 @@ def calculate_meld_3_0(
     - Bili lower bound: 1.0.
     - INR lower bound: 1.0.
     - Na bounded [125, 137].
-    - Albumin bounded [2.0, 3.5] g/dL.
+    - Albumin bounded [1.5, 3.5] g/dL.
     - Female bonus: 1.33 points.
     - Final score rounded to nearest integer, bounded [6, 40].
     """
@@ -161,7 +161,7 @@ def calculate_meld_3_0(
     bili = max(total_bilirubin_mg_dl, 1.0)
     inr_val = max(inr, 1.0)
     na = min(max(serum_sodium_mmol_l, 125.0), 137.0)
-    alb = min(max(serum_albumin_g_dl, 2.0), 3.5)
+    alb = min(max(serum_albumin_g_dl, 1.5), 3.5)
     female_factor = 1.0 if is_female else 0.0
 
     meld_3_raw = (
@@ -181,7 +181,12 @@ def calculate_meld_3_0(
 
 
 def estimate_meld_mortality(meld_score: int) -> float:
-    """Estimates 90-day waitlist mortality rate (%) from MELD score."""
+    """Return legacy 90-day mortality bands historically reported for MELD.
+
+    These bands are retained for backward compatibility and educational comparison.
+    They are not an OPTN allocation probability and should not be used as an
+    individualized prognosis.
+    """
     if meld_score <= 9:
         return 1.9
     elif meld_score <= 19:
@@ -219,16 +224,19 @@ def evaluate_meld_suite(
             on_dialysis,
         )
 
-    mortality = estimate_meld_mortality(meld_na)
+    # Historical mortality bands are based on the original MELD literature rather
+    # than current allocation policy. Keep them for compatibility, but do not infer
+    # Status 1A or transplant eligibility from a calculated MELD score.
+    mortality = estimate_meld_mortality(orig_meld)
 
     if meld_na >= 35:
-        tier = "CRITICAL / STATUS 1A CANDIDATE"
+        tier = "MELD-Na 35-40"
     elif meld_na >= 25:
-        tier = "HIGH URGENCY TRANSPLANT CANDIDATE"
+        tier = "MELD-Na 25-34"
     elif meld_na >= 15:
-        tier = "INTERMEDIATE RISK (STANDARD TRANSPLANT LISTING CRITERIA MET)"
+        tier = "MELD-Na 15-24"
     else:
-        tier = "LOW SHORT-TERM MORTALITY RISK"
+        tier = "MELD-Na 6-14"
 
     details = {
         "serum_creatinine": serum_creatinine_mg_dl,
@@ -239,6 +247,11 @@ def evaluate_meld_suite(
         "is_female": is_female,
         "on_dialysis": on_dialysis,
         "transplant_evaluation_indicated": meld_na >= 15,
+        "status_1a_not_inferred": True,
+        "mortality_estimate_note": (
+            "Legacy mortality band based on original MELD; not an individualized "
+            "prognosis or current OPTN allocation probability."
+        ),
     }
 
     return MELDResult(
@@ -341,19 +354,19 @@ def calculate_child_pugh(
         one_yr = 100.0
         two_yr = 85.0
         periop = 10.0
-        interp = "Class A (Well-compensated cirrhosis). Low surgical risk; preserved functional hepatic reserve."
+        interp = "Child-Pugh Class A. Historical outcome estimates are population-level and not individualized."
     elif total_points <= 9:
         ctp_class = ChildPughClass.CLASS_B
         one_yr = 80.0
         two_yr = 60.0
         periop = 30.0
-        interp = "Class B (Significant functional compromise). Moderate surgical risk; evaluate for liver transplantation."
+        interp = "Child-Pugh Class B. Historical outcome estimates are population-level and not individualized."
     else:
         ctp_class = ChildPughClass.CLASS_C
         one_yr = 45.0
         two_yr = 35.0
         periop = 80.0
-        interp = "Class C (Decompensated cirrhosis). High perioperative mortality; urgent liver transplantation evaluation indicated."
+        interp = "Child-Pugh Class C. Historical outcome estimates are population-level and not individualized."
 
     return ChildPughResult(
         total_points=total_points,
@@ -444,44 +457,44 @@ def evaluate_clif_aclf(
         label = "ACLF Grade 3 (>= 3 Organ Failures)"
         mortality = 78.6
         icu = True
-        urgency = "EMERGENT: Immediate ICU admission; high risk of multi-organ collapse. Expedited transplant listing."
+        urgency = "Very high acuity: multidisciplinary critical-care assessment is generally appropriate."
     elif num_failures == 2:
         grade = ACLFGrade.GRADE_2
         label = "ACLF Grade 2 (2 Organ Failures)"
         mortality = 32.0
         icu = True
-        urgency = "URGENT: Step-down or ICU monitoring; aggressive organ support and targeted infection workup."
+        urgency = "High acuity: consider monitored or critical-care management according to the clinical context."
     elif num_failures == 1:
         if kidney_fail:
             grade = ACLFGrade.GRADE_1
             label = "ACLF Grade 1 (Single Kidney Failure)"
             mortality = 22.0
             icu = False
-            urgency = "HIGH: Close inpatient nephro-hepatology monitoring. Initiate HRS-AKI protocol."
+            urgency = "High acuity: assess renal dysfunction and possible HRS-AKI in the full clinical context."
         elif (liver_fail or coag_fail or circ_fail or resp_fail) and (is_mild_kidney or is_mild_he):
             grade = ACLFGrade.GRADE_1
             label = "ACLF Grade 1 (Single Organ Failure with Renal/Brain Dysfunction)"
             mortality = 22.0
             icu = False
-            urgency = "HIGH: Aggressive medical stabilization to prevent second organ failure."
+            urgency = "High acuity: evaluate and support the failing organ and secondary dysfunction."
         elif brain_fail and is_mild_kidney:
             grade = ACLFGrade.GRADE_1
             label = "ACLF Grade 1 (Single Brain Failure with Renal Dysfunction)"
             mortality = 22.0
             icu = False
-            urgency = "HIGH: Airway protection, lactulose/rifaximin titration, and renal preservation."
+            urgency = "High acuity: assess airway, encephalopathy precipitants, and renal dysfunction."
         else:
             grade = ACLFGrade.NO_ACLF
             label = "No ACLF (Single Non-Kidney Organ Failure without secondary dysfunction)"
             mortality = 4.5
             icu = False
-            urgency = "MODERATE: Standard acute decompensation ward care."
+            urgency = "Acute decompensation without ACLF grade 1-3 by these criteria."
     else:
         grade = ACLFGrade.NO_ACLF
         label = "No ACLF (Acute Decompensation without Organ Failure)"
         mortality = 4.5
         icu = False
-        urgency = "STANDARD: Routine inpatient management of acute decompensation."
+        urgency = "No ACLF organ failure identified by these criteria."
 
     of_status = OrganFailureStatus(
         liver_failure=liver_fail,
@@ -523,7 +536,7 @@ def evaluate_sbp_protocol(
     total_bilirubin_mg_dl: float = 2.0,
 ) -> SBPProtocolResult:
     """
-    Spontaneous Bacterial Peritonitis (SBP) Diagnostic & Sort Albumin Protocol.
+    Spontaneous Bacterial Peritonitis (SBP) threshold and Sort et al. albumin regimen.
     Diagnosis: Ascitic PMN count >= 250 / mm³.
     Sort Albumin Infusion Protocol:
     - Day 1 (within 6h of diagnosis): 1.5 g/kg IV 20% or 25% Albumin
@@ -539,18 +552,18 @@ def evaluate_sbp_protocol(
 
     recs = []
     if is_sbp:
-        recs.append("Initiate empiric IV third-generation cephalosporin (Ceftriaxone 2 g IV Q24H or Cefotaxime 2 g IV Q8H) for 5 days.")
+        recs.append("Ascitic PMN >= 250/mm³ is compatible with SBP; antibiotic choice and duration should follow local guidance, resistance patterns, allergies, and clinical context.")
         recs.append(f"Administer IV Albumin (20% or 25%): Day 1 dose = {day1_albumin_g} g (1.5 g/kg within 6h); Day 3 dose = {day3_albumin_g} g (1.0 g/kg).")
-        recs.append("Discontinue non-selective beta-blockers (NSBB) temporarily during acute SBP episode if hypotension occurs.")
+        recs.append("Review vasoactive and blood-pressure-lowering medications if hypotension or acute kidney injury is present.")
         recs.append("Perform repeat paracentesis at 48 hours if no clinical improvement to verify >= 25% reduction in PMN count.")
-        recs.append("Initiate lifelong secondary SBP prophylaxis with Norfloxacin 400 mg/day or Ciprofloxacin 500 mg/day or TMP-SMX after resolution.")
+        recs.append("Assess indication for secondary SBP prophylaxis after treatment, accounting for local antimicrobial resistance and contraindications.")
     else:
         recs.append("Ascitic PMN count < 250/mm³; SBP not confirmed. Continue monitoring if clinical suspicion remains high.")
 
     return SBPProtocolResult(
         is_sbp_confirmed=is_sbp,
         ascitic_pmn_count=ascitic_pmn_count_per_mm3,
-        antibiotic_regimen="Ceftriaxone 2 g IV Q24H (or Cefotaxime 2 g IV Q8H) for 5 days" if is_sbp else "None",
+        antibiotic_regimen="Empiric therapy per local SBP guidance and resistance patterns" if is_sbp else "None",
         albumin_dosing_schedule={
             "day_1_grams": day1_albumin_g if is_sbp else 0,
             "day_3_grams": day3_albumin_g if is_sbp else 0,
@@ -574,12 +587,17 @@ def evaluate_hrs_aki_protocol(
     current_creatinine_mg_dl: float,
     patient_weight_kg: float,
     has_ascites: bool = True,
-    no_response_to_48h_albumin_expansion: bool = True,
-    no_shock_or_nephrotoxins: bool = True,
-    no_proteinuria_or_hematuria: bool = True,
+    no_response_to_48h_albumin_expansion: bool = False,
+    no_shock_or_nephrotoxins: bool = False,
+    no_proteinuria_or_hematuria: bool = False,
 ) -> HRSAKIProtocolResult:
     """
-    International Club of Ascites (ICA-AKI) Diagnostic & Terlipressin/Albumin Engine.
+    HRS-AKI screening helper using simplified creatinine change and exclusion flags.
+
+    This function does not encode the required timing of creatinine change and does
+    not establish a diagnosis by itself. Exclusion criteria must be explicitly
+    supplied by the caller.
+    
     """
     if baseline_creatinine_mg_dl <= 0 or current_creatinine_mg_dl <= 0:
         raise ValueError("Creatinine values must be positive.")
@@ -610,19 +628,17 @@ def evaluate_hrs_aki_protocol(
 
     guidance = []
     if meets_hrs:
-        guidance.append("DIAGNOSIS: Hepatorenal Syndrome - Acute Kidney Injury (HRS-AKI) criteria met.")
-        guidance.append("FIRST-LINE THERAPY: Terlipressin continuous IV infusion starting at 2 mg/day (titrated up to 4 mg/day if Cr does not decrease by >= 25% after 48h), plus IV 20% Albumin 20-40 g/day.")
-        guidance.append("ALTERNATIVE THERAPY: Norepinephrine continuous IV infusion (0.5 to 3.0 mg/h) titrated to achieve MAP increase of >= 10 mmHg or MAP > 65 mmHg + IV Albumin.")
-        guidance.append("SECOND-LINE OR ORAL REGIMEN: Midodrine (7.5 - 15 mg PO TID) + Octreotide (100 - 200 mcg SC TID) + IV Albumin.")
-        guidance.append("Monitor continuously for Terlipressin adverse events: respiratory distress / pulmonary edema, ischemic cardiac events, or peripheral ischemia.")
-        guidance.append("Initiate urgent liver transplantation evaluation (simultaneous liver-kidney transplant if RRT > 4-8 weeks).")
+        guidance.append("SCREEN POSITIVE: the supplied AKI pattern and explicitly confirmed exclusion criteria are compatible with HRS-AKI.")
+        guidance.append("Vasoconstrictor and albumin treatment requires clinician review of contraindications, oxygenation, volume status, jurisdiction-specific labeling, and local protocols.")
+        guidance.append("Terlipressin carries important respiratory and ischemic safety considerations; do not infer a dose from this screening result.")
+        guidance.append("Assess candidacy for liver transplantation according to the complete clinical and transplant-program context.")
     else:
-        guidance.append("Full ICA HRS-AKI criteria not met. Confirm 48-hour diuretic withdrawal and IV albumin volume challenge (1 g/kg/day x 2 days).")
+        guidance.append("Screening criteria are incomplete or not met. Confirm AKI timing, volume status, medication exposure, shock, structural kidney disease, and current HRS-AKI criteria before classification.")
 
     return HRSAKIProtocolResult(
         is_hrs_aki_suspected=meets_hrs,
         kdigo_aki_stage=stage,
-        first_line_pharmacotherapy="Terlipressin continuous IV (2-4 mg/day) + IV Albumin (20-40 g/day)" if meets_hrs else "Volume challenge only",
+        first_line_pharmacotherapy="Clinician-directed vasoconstrictor + albumin when HRS-AKI is confirmed and treatment is appropriate" if meets_hrs else "No treatment recommendation from screening result",
         albumin_infusion_plan=f"20% Albumin {daily_alb_g} g/day (1 g/kg, max 100 g/day) during acute challenge phase",
         management_guidance=guidance,
     )
@@ -653,9 +669,9 @@ def evaluate_tips_eligibility(
     """
     abs_contra = []
     if has_severe_pulmonary_hypertension:
-        abs_contra.append("Severe pulmonary hypertension (Mean PAP > 45 mmHg or RVSP > 50 mmHg).")
+        abs_contra.append("Moderate-to-severe pulmonary hypertension despite medical optimization (requires specialist/invasive assessment).")
     if has_congestive_heart_failure:
-        abs_contra.append("Severe congestive heart failure (NYHA Class III/IV, Left Ventricular EF < 45%).")
+        abs_contra.append("Severe congestive heart failure / advanced cardiac dysfunction.")
     if has_severe_uncontrolled_infection:
         abs_contra.append("Severe uncontrolled systemic sepsis or biliary tract infection.")
 
@@ -669,24 +685,27 @@ def evaluate_tips_eligibility(
     if has_portal_vein_thrombosis_complete:
         rel_contra.append("Complete portal vein cavernous transformation / occlusion.")
 
-    is_eligible = (len(abs_contra) == 0) and (meld_score <= 24)
+    # No single MELD cutoff should be treated as an absolute TIPS eligibility rule.
+    # A positive screen only means that no explicit absolute contraindication supplied
+    # to this function was identified.
+    is_eligible = len(abs_contra) == 0
 
     if len(abs_contra) > 0:
-        risk = "CONTRAINDICATED"
+        risk = "ABSOLUTE CONTRAINDICATION FLAG"
     elif len(rel_contra) >= 2 or meld_score > 18:
         risk = "HIGH RISK"
     elif len(rel_contra) == 1:
         risk = "MODERATE RISK"
     else:
-        risk = "FAVORABLE CANDIDATE"
+        risk = "NO LISTED HIGH-RISK FEATURE"
 
     recs = []
     if is_eligible:
-        recs.append("Proceed with echocardiography and baseline contrast CT / Doppler portal venous imaging.")
-        recs.append("Use PTFE-covered stent grafts (expanded polytetrafluoroethylene) sized 8-10 mm to minimize stenosis.")
-        recs.append("Pre-treat with prophylactic lactulose / rifaximin to reduce post-TIPS encephalopathy incidence.")
+        recs.append("Complete multidisciplinary TIPS assessment, including indication-specific risk/benefit review.")
+        recs.append("Obtain appropriate cross-sectional portal venous imaging and echocardiographic assessment when clinically feasible.")
+        recs.append("Assess individualized post-TIPS hepatic encephalopathy risk and preventive strategy.")
     else:
-        recs.append("TIPS is contraindicated or exceptionally high risk. Evaluate for surgical shunt, endoscopic therapy, or urgent liver transplantation.")
+        recs.append("An explicit contraindication flag is present; specialist review and alternative management should be considered.")
 
     return TIPSEligibilityResult(
         is_candidate=is_eligible,
@@ -741,6 +760,9 @@ class CirrhosisDecompensationEngine:
         pao2_fio2_ratio: Optional[float] = None,
         has_severe_pulm_htn: bool = False,
         has_severe_heart_failure: bool = False,
+        hrs_no_response_to_albumin: bool = False,
+        hrs_no_shock_or_nephrotoxins: bool = False,
+        hrs_no_structural_kidney_signs: bool = False,
         case_id: str = "CASE-CIRR-001",
         patient_id: str = "PATIENT-HEP-001",
     ) -> CirrhosisClinicalDossier:
@@ -793,6 +815,9 @@ class CirrhosisDecompensationEngine:
                 current_creatinine_mg_dl=serum_creatinine_mg_dl,
                 patient_weight_kg=patient_weight_kg,
                 has_ascites=ascites != AscitesDegree.NONE,
+                no_response_to_48h_albumin_expansion=hrs_no_response_to_albumin,
+                no_shock_or_nephrotoxins=hrs_no_shock_or_nephrotoxins,
+                no_proteinuria_or_hematuria=hrs_no_structural_kidney_signs,
             )
 
         # 6. TIPS Eligibility
@@ -813,26 +838,26 @@ class CirrhosisDecompensationEngine:
         if meld_res.meld_na >= 25:
             alerts.append(f"HIGH MELD ALERT: MELD-Na of {meld_res.meld_na} indicates severe hepatic dysfunction (90-day mortality {meld_res.three_month_mortality_pct}%).")
         if sbp_res and sbp_res.is_sbp_confirmed:
-            alerts.append(f"SBP INFECTION ALERT: Ascitic PMN count ({sbp_res.ascitic_pmn_count:.0f}/mm³) exceeds diagnostic threshold (>= 250/mm³). Immediate IV Albumin + Ceftriaxone required.")
+            alerts.append(f"SBP THRESHOLD FLAG: Ascitic PMN count ({sbp_res.ascitic_pmn_count:.0f}/mm³) is >= 250/mm³; review for SBP and secondary peritonitis in clinical context.")
         if hrs_res and hrs_res.is_hrs_aki_suspected:
-            alerts.append("HRS-AKI ALERT: Acute Kidney Injury meeting HRS diagnostic criteria. Initiate Terlipressin/Norepinephrine + Albumin.")
+            alerts.append("HRS-AKI SCREEN: Supplied AKI and exclusion criteria are compatible with HRS-AKI; confirm diagnosis and treatment eligibility clinically.")
         if encephalopathy.value >= 3:
-            alerts.append(f"AIRWAY PROTECTION ALERT: Severe Hepatic Encephalopathy (West Haven Grade {encephalopathy.value}) requires aspiration precautions and consideration of endotracheal intubation.")
+            alerts.append(f"SEVERE ENCEPHALOPATHY FLAG: West Haven Grade {encephalopathy.value}; urgent airway and precipitant assessment may be required.")
 
         # Prioritized Action Checklist
         actions = []
         if aclf_res.icu_admission_indicated:
-            actions.append("1. Transfer patient to ICU / step-down monitored bed for continuous hemodynamics.")
+            actions.append("1. Consider higher-acuity monitoring based on organ failures and overall clinical status.")
         if sbp_res and sbp_res.is_sbp_confirmed:
-            actions.append(f"2. Administer Day 1 IV Albumin ({sbp_res.albumin_dosing_schedule['day_1_grams']} g) and start Ceftriaxone 2 g IV Q24H.")
+            actions.append(f"2. Review SBP management; reference albumin calculation is {sbp_res.albumin_dosing_schedule['day_1_grams']} g on day 1 and {sbp_res.albumin_dosing_schedule['day_3_grams']} g on day 3.")
         if hrs_res and hrs_res.is_hrs_aki_suspected:
-            actions.append("3. Initiate Terlipressin continuous IV infusion (2 mg/day) and 20% Albumin (20-40 g/day).")
+            actions.append("3. Confirm HRS-AKI criteria and review vasoconstrictor/albumin treatment eligibility and safety.")
         if encephalopathy.value >= 1:
-            actions.append(f"4. Titrate Lactulose (30-45 mL PO Q2H until bowel evacuation) targeting 2-3 soft bowel movements daily; add Rifaximin 550 mg PO BID.")
+            actions.append(f"4. Assess and treat hepatic encephalopathy (West Haven grade {encephalopathy.value}) according to current clinical guidance and precipitating factors.")
         if meld_res.details["transplant_evaluation_indicated"]:
-            actions.append("5. Activate expedited Orthotopic Liver Transplantation (OLT) candidate multidisciplinary evaluation.")
+            actions.append("5. Consider transplant-center evaluation where clinically appropriate; calculated MELD alone does not establish listing status.")
         if not actions:
-            actions.append("1. Maintain standard decompensated cirrhosis maintenance protocol (low-sodium diet, diuretic titration, outpatient monitoring).")
+            actions.append("1. No high-acuity flag was generated by the supplied inputs; clinical assessment remains required.")
 
         return CirrhosisClinicalDossier(
             case_id=case_id,
@@ -853,7 +878,7 @@ class CirrhosisDecompensationEngine:
 # ==============================================================================
 
 def process_batch_csv(input_csv_path: str, output_csv_path: str) -> int:
-    """Processes batch cirrhosis patient records from CSV."""
+    """Process batch cirrhosis records from CSV without inventing missing labs."""
     engine = CirrhosisDecompensationEngine()
     processed_count = 0
 
@@ -868,12 +893,27 @@ def process_batch_csv(input_csv_path: str, output_csv_path: str) -> int:
     for row in rows:
         case_id = row.get("case_id", f"CASE-{processed_count+1:03d}")
         patient_id = row.get("patient_id", f"PT-{processed_count+1:04d}")
-        cr = float(row.get("creatinine", row.get("serum_creatinine", 1.2)))
-        bili = float(row.get("bilirubin", row.get("total_bilirubin", 2.1)))
-        inr_val = float(row.get("inr", 1.4))
-        na = float(row.get("sodium", row.get("serum_sodium", 134.0)))
-        alb = float(row.get("albumin", row.get("serum_albumin", 3.0)))
-        wt = float(row.get("weight_kg", row.get("weight", 70.0)))
+        def required_float(*names: str) -> float:
+            for name in names:
+                value = row.get(name)
+                if value is not None and str(value).strip() != "":
+                    try:
+                        return float(value)
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"Row {processed_count + 2}: field '{name}' must be numeric."
+                        ) from exc
+            raise ValueError(
+                f"Row {processed_count + 2}: missing required field "
+                f"({' or '.join(names)})."
+            )
+
+        cr = required_float("creatinine", "serum_creatinine")
+        bili = required_float("bilirubin", "total_bilirubin")
+        inr_val = required_float("inr")
+        na = required_float("sodium", "serum_sodium")
+        alb = required_float("albumin", "serum_albumin")
+        wt = required_float("weight_kg", "weight")
         female = str(row.get("is_female", row.get("female", "false"))).lower() in ("true", "1", "yes")
         dialysis = str(row.get("on_dialysis", row.get("dialysis", "false"))).lower() in ("true", "1", "yes")
         
