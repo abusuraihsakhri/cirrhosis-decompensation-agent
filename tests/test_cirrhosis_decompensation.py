@@ -385,6 +385,7 @@ class TestMasterEngineAndBatch(unittest.TestCase):
         )
         self.assertFalse(res.is_candidate)
         self.assertEqual(res.risk_level, "ABSOLUTE CONTRAINDICATION FLAG")
+
     def test_batch_csv_processing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             in_csv = os.path.join(tmpdir, "cirrhosis_input.csv")
@@ -402,7 +403,6 @@ class TestMasterEngineAndBatch(unittest.TestCase):
             with open(out_csv, "r", encoding="utf-8") as f:
                 lines = f.readlines()
                 self.assertEqual(len(lines), 3)
-
 
     def test_batch_rejects_missing_required_labs(self):
         with tempfile.TemporaryDirectory() as tmpdir:
