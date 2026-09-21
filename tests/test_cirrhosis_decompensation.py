@@ -87,6 +87,34 @@ class TestMELDCalculations(unittest.TestCase):
         )
         self.assertGreaterEqual(score_f, score_m)
 
+    def test_meld_3_0_albumin_lower_bound_is_1_5(self):
+        below_floor = calculate_meld_3_0(
+            serum_creatinine_mg_dl=2.4,
+            total_bilirubin_mg_dl=7.0,
+            inr=2.0,
+            serum_sodium_mmol_l=128.0,
+            serum_albumin_g_dl=1.0,
+            is_female=False,
+        )
+        at_floor = calculate_meld_3_0(
+            serum_creatinine_mg_dl=2.4,
+            total_bilirubin_mg_dl=7.0,
+            inr=2.0,
+            serum_sodium_mmol_l=128.0,
+            serum_albumin_g_dl=1.5,
+            is_female=False,
+        )
+        at_two = calculate_meld_3_0(
+            serum_creatinine_mg_dl=2.4,
+            total_bilirubin_mg_dl=7.0,
+            inr=2.0,
+            serum_sodium_mmol_l=128.0,
+            serum_albumin_g_dl=2.0,
+            is_female=False,
+        )
+        self.assertEqual(below_floor, at_floor)
+        self.assertNotEqual(at_floor, at_two)
+
     def test_meld_invalid_inputs(self):
         with self.assertRaises(ValueError):
             calculate_original_meld(-1.0, 2.0, 1.0)
@@ -231,6 +259,8 @@ class TestAcuteDecompensationProtocols(unittest.TestCase):
             patient_weight_kg=70.0,
             has_ascites=True,
             no_response_to_48h_albumin_expansion=True,
+            no_shock_or_nephrotoxins=True,
+            no_proteinuria_or_hematuria=True,
         )
         self.assertTrue(res.is_hrs_aki_suspected)
         self.assertEqual(res.kdigo_aki_stage, 2)
@@ -245,7 +275,7 @@ class TestAcuteDecompensationProtocols(unittest.TestCase):
             has_severe_pulmonary_hypertension=True,
         )
         self.assertFalse(res.is_candidate)
-        self.assertEqual(res.risk_level, "CONTRAINDICATED")
+        self.assertEqual(res.risk_level, "ABSOLUTE CONTRAINDICATION FLAG")
         self.assertTrue(len(res.absolute_contraindications) >= 1)
 
     def test_tips_favorable_candidate(self):
@@ -299,7 +329,7 @@ class TestMasterEngineAndBatch(unittest.TestCase):
         self.assertGreaterEqual(score, 30)
         self.assertLessEqual(score, 40)
 
-    def test_meld_suite_status_1a_tier(self):
+    def test_high_meld_does_not_infer_status_1a(self):
         res = evaluate_meld_suite(
             serum_creatinine_mg_dl=3.8,
             total_bilirubin_mg_dl=18.0,
@@ -309,7 +339,8 @@ class TestMasterEngineAndBatch(unittest.TestCase):
             is_female=False,
         )
         self.assertGreaterEqual(res.meld_na, 35)
-        self.assertIn("STATUS 1A", res.allocation_tier)
+        self.assertNotIn("STATUS 1A", res.allocation_tier)
+        self.assertTrue(res.details["status_1a_not_inferred"])
         self.assertTrue(res.details["transplant_evaluation_indicated"])
 
     def test_aclf_respiratory_failure_pao2_fio2(self):
@@ -334,7 +365,7 @@ class TestMasterEngineAndBatch(unittest.TestCase):
         )
         self.assertTrue(res.organ_failures.respiratory_failure)
 
-    def test_hrs_aki_stage_3_high_creatinine(self):
+    def test_hrs_aki_stage_3_requires_explicit_exclusions(self):
         res = evaluate_hrs_aki_protocol(
             baseline_creatinine_mg_dl=1.1,
             current_creatinine_mg_dl=4.2,  # Cr >= 4.0 -> Stage 3
@@ -342,7 +373,7 @@ class TestMasterEngineAndBatch(unittest.TestCase):
             has_ascites=True,
         )
         self.assertEqual(res.kdigo_aki_stage, 3)
-        self.assertTrue(res.is_hrs_aki_suspected)
+        self.assertFalse(res.is_hrs_aki_suspected)
 
     def test_tips_contraindicated_congestive_heart_failure(self):
         res = evaluate_tips_eligibility(
@@ -371,6 +402,17 @@ class TestMasterEngineAndBatch(unittest.TestCase):
             with open(out_csv, "r", encoding="utf-8") as f:
                 lines = f.readlines()
                 self.assertEqual(len(lines), 3)
+
+
+    def test_batch_rejects_missing_required_labs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_csv = os.path.join(tmpdir, "bad.csv")
+            out_csv = os.path.join(tmpdir, "out.csv")
+            with open(in_csv, "w", encoding="utf-8") as f:
+                f.write("case_id,creatinine,bilirubin,inr,sodium,weight_kg\n")
+                f.write("CASE-001,1.2,2.0,1.3,135,70\n")
+            with self.assertRaises(ValueError):
+                process_batch_csv(in_csv, out_csv)
 
 
 if __name__ == "__main__":
